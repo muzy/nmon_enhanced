@@ -3617,6 +3617,10 @@ printf("TIMESTAMP=%d.\n",time_stamp_type);
 			break;
 		case 'c':
 			maxloops = atoi(optarg);
+			if (maxloops == -1)
+				maxloops = INT_MAX;
+			else if(maxloops == 0)
+				maxloops = 1;
 			break;
 		case 'N':
 			show_nfs = 1;
@@ -3717,12 +3721,8 @@ printf("TIMESTAMP=%d.\n",time_stamp_type);
 	/* Set parameters if not set by above */
 	if (maxloops == -1)
 		maxloops = INT_MAX;
-	else if(maxloops == 0)
-		maxloops = 1;
 	if (seconds  == -1)
 		seconds = 2;
-	else if(seconds == 0) /* fix when float values are specified */
-	    seconds = 1;
     if (cursed)
         show_dgroup = 0;
 
