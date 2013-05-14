@@ -3419,7 +3419,7 @@ int main(int argc, char **argv)
 	int	proc_first_time =1;
 	pid_t	firstproc = (pid_t)0;
 	pid_t childpid = -1;
-	int ralfmode = 0;
+	int showchildpid = 0;
 	char	pgrp[32];
 	struct tm *tim; /* used to work out the hour/min/second */
 	float	total_busy;	/* general totals */
@@ -3605,7 +3605,7 @@ printf("TIMESTAMP=%d.\n",time_stamp_type);
 			seconds = atoi(optarg);
 			break;
 		case 'p':
-			ralfmode = 1;
+			showchildpid = 1;
 			break;
 		case 'b':
 			colour = 0;
@@ -3714,8 +3714,10 @@ printf("TIMESTAMP=%d.\n",time_stamp_type);
 		maxloops = 9999999;
 	if (seconds  == -1)
 		seconds = 2;
-        if (cursed)
-                show_dgroup = 0;
+	else if(seconds == 0) /* fix when float values are specified */
+	    seconds = 1;
+    if (cursed)
+        show_dgroup = 0;
 
 	/* -D need -g filename */
 	if(extended_disk == 1 && show_dgroup == 0) {
@@ -3862,7 +3864,7 @@ printf("TIMESTAMP=%d.\n",time_stamp_type);
 		/* disconnect from terminal */
 		fflush(NULL);
 		if (!debug && (childpid = fork()) != 0) {
-			if(ralfmode)
+			if(showchildpid)
 				printf("%d\n",childpid);
 			exit(0); /* parent returns OK */
 		}
