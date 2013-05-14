@@ -6034,9 +6034,16 @@ redo:
 			errno = 0;
 			ret = sleep(secs); 
 			if( (ret != 0 || errno != 0) && loop != maxloops ) {
-				fprintf(fp,"ERROR,%s,sleep got interrupted:",LOOP);
-				fprintf(fp,"ret was %d, ",ret);
-				fprintf(fp,"errno was %d\n",errno);
+				if(cursed){
+					fprintf(fp,"ERROR,%s,sleep got interrupted:",LOOP);
+					fprintf(fp,"ret was %d, ",ret);
+					fprintf(fp,"errno was %d\n",errno);
+				}else if(show_rrd){
+					// @FIXME - Need good syntax
+					fprintf(fp,"rrdtool update error.rrd %s",LOOP);
+				}else{
+					fprintf(fp,"ERROR,%s,%d,%d\n",LOOP,ret,errno);
+				}
 				secs=ret;
 				goto redo;
 			}
