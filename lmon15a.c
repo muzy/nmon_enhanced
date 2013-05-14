@@ -31,6 +31,7 @@ static char *SccsId = "nmon " VERSION;
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <limits.h>
 #include <ctype.h>
 #include <ncurses.h>
 #include <signal.h>
@@ -3603,6 +3604,10 @@ printf("TIMESTAMP=%d.\n",time_stamp_type);
 			break;
 		case 's':
 			seconds = atoi(optarg);
+			if(seconds == -1)
+				seconds = INT_MAX;
+			else if(seconds == 0)
+				seconds = 1;
 			break;
 		case 'p':
 			showchildpid = 1;
@@ -3711,7 +3716,9 @@ printf("TIMESTAMP=%d.\n",time_stamp_type);
 	}
 	/* Set parameters if not set by above */
 	if (maxloops == -1)
-		maxloops = 9999999;
+		maxloops = INT_MAX;
+	else if(maxloops == 0)
+		maxloops = 1;
 	if (seconds  == -1)
 		seconds = 2;
 	else if(seconds == 0) /* fix when float values are specified */
