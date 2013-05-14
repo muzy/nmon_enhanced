@@ -3894,7 +3894,7 @@ printf("TIMESTAMP=%d.\n",time_stamp_type);
 		fprintf(fp,"AAA,user,%s\n", getenv("USER"));
 		fprintf(fp,"AAA,OS,Linux,%s,%s,%s\n",uts.release,uts.version,uts.machine); 
 		fprintf(fp,"AAA,runname,%s\n", run_name);
-		fprintf(fp,"AAA,time,%02d:%02d.%02d\n", tim->tm_hour, tim->tm_min, tim->tm_sec);
+		fprintf(fp,"AAA,time,%02d:%02d:%02d\n", tim->tm_hour, tim->tm_min, tim->tm_sec);
 		fprintf(fp,"AAA,date,%02d-%3s-%02d\n", tim->tm_mday, month[tim->tm_mon-1], tim->tm_year+2000);
 		fprintf(fp,"AAA,interval,%d\n", seconds);
 		fprintf(fp,"AAA,snapshots,%d\n", maxloops);
