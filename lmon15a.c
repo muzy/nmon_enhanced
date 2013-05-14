@@ -354,6 +354,7 @@ char	run_name[256];
 int	run_name_set = 0;
 char	fullhostname[256];
 int	loop;
+int breakpoint_counter = 0;
 
 #define DPL 150 /* Disks per line for file output to ensure it 
 		does not overflow the spreadsheet input line max */
@@ -363,6 +364,8 @@ int disks_per_line = DPL;
 #define NEWDISKGROUP(disk) ( (disk) % disks_per_line == 0)
 
 /* Mode of output variables */
+int breakpoints_enabled = 0;
+int normalized_output = 0;
 int	show_aaa     = 1;
 int	show_para    = 1;
 int	show_headings= 1;
@@ -419,11 +422,11 @@ int	colour = 1;	/* 1 = using colour curses and
 					attroff(A_STANDOUT); }
 FILE *fp;	/* filepointer for spreadsheet output */
 
-
+/* @FIXME PLEASEEEE*/
 char *timestamp(int loop, time_t eon)
 {
 static char string[64];
-	if(show_rrd)
+	if(show_rrd || normalized_output)
 		sprintf(string,"%ld",(long)eon);
 	else
 		sprintf(string,"T%04d",loop);
@@ -2152,9 +2155,23 @@ int waitstatus;
 		signal(SIGCHLD, interrupt);
 		return;
 	}
-	if (signum == SIGUSR1 || signum == SIGUSR2) {
-		maxloops = loop;
-		return;
+	if (signum == SIGUSR2) {
+			maxloops = loop;
+			return;
+	}
+	if (signum == SIGUSR1) {
+		if(!breakpoints_enabled){
+			maxloops = loop;
+			return;
+		}else{
+			if(!cursed){
+				if(show_rrd)
+					fprintf(fp,"rrdtool update breakpoint.rrd %s,%d\n",LOOP,breakpoint_counter++);
+				else
+					fprintf(fp,"BREAKPOINT,%s,%d\n",LOOP,breakpoint_counter++);
+			}
+			return;
+		}
 	}
 	if (signum == SIGWINCH) {
 		CURSE endwin(); /* stop + start curses so it works out the # of row and cols */
@@ -3655,6 +3672,13 @@ printf("TIMESTAMP=%d.\n",time_stamp_type);
 		case 'r': strcpy(run_name,optarg); 
 			run_name_set++;
 			break;
+		case 'e': /* enhanced mode where SIGUSR1 sets a breakpoint */
+			breakpoints_enabled = 1;
+			break;
+		case 'E': /* enhanced mode where output is normalized */
+			breakpoints_enabled = 1;
+			normalized_output = 1;
+			break;
 		case 'F': /* background mode with user supplied filename */
 			strcpy(user_filename,optarg);
 			user_filename_set++;
@@ -3674,7 +3698,6 @@ printf("TIMESTAMP=%d.\n",time_stamp_type);
 			varperftmp++;
 			go_background(4*24, 15*60);
 			break;
-
 		case 'x': /* background mode for 1 day capacity planning */
 			go_background(4*24, 15*60);
 			show_top =1;
@@ -3688,8 +3711,10 @@ printf("TIMESTAMP=%d.\n",time_stamp_type);
 		case 'Z':
 			show_raw=1;
 			break;
+		
 		case 'l':
 			disks_per_line = atoi(optarg);
+			/* does the following line make sense in any way? @FIXME! */
 			if(disks_per_line < 3 || disks_per_line >250) disks_per_line = 100;
 			break;
 		case 'C': /* commandlist argument */
@@ -3718,6 +3743,7 @@ printf("TIMESTAMP=%d.\n",time_stamp_type);
                         break;
 		}
 	}
+	
 	/* Set parameters if not set by above */
 	if (maxloops == -1)
 		maxloops = INT_MAX;
@@ -6051,7 +6077,7 @@ redo:
 					// @FIXME - Need good syntax
 					fprintf(fp,"rrdtool update error.rrd %s",LOOP);
 				}else{
-					fprintf(fp,"ERROR,%s,%d,%d\n",LOOP,ret,errno);
+					fprintf(fp,"ERROR,%s,sleep interrupt,%d,%d\n",LOOP,ret,errno);
 				}
 				secs=ret;
 				goto redo;
