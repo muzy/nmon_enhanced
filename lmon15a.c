@@ -6068,7 +6068,10 @@ fprintf(fp,"VM,Paging and Virtual Memory,nr_dirty,nr_writeback,nr_unstable,nr_pa
 redo:
 			errno = 0;
 			ret = sleep(secs); 
-			if( (ret != 0 || errno != 0) && loop != maxloops ) {
+			/* Breakpoint_counter > 0 needed because loops have to be interrupted once
+			 * a breakpoint occurs
+			 */
+			if( (ret != 0 || errno != 0) && loop != maxloops && breakpoint_counter > 0) {
 				if(cursed){
 					fprintf(fp,"ERROR,%s,sleep got interrupted:",LOOP);
 					fprintf(fp,"ret was %d, ",ret);
