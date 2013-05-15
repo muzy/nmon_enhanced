@@ -3467,6 +3467,8 @@ int main(int argc, char **argv)
 	char *formatstring;
 	char user_filename[512];
 	char user_filename_set = 0;
+	char pid_filename[512];
+	char pid_filename_set = 0;
 	struct statfs statfs_buffer;
 	float fs_size;
 	float fs_bsize;
@@ -3611,7 +3613,7 @@ printf("TIMESTAMP=%d.\n",time_stamp_type);
 		pagesize = sysconf(_SC_PAGESIZE);
 	proc_init();
 
-	while ( -1 != (i = getopt(argc, argv, "?Rhs:bc:Dd:fF:r:tTxXzeEl:qpC:Vg:Nm:I:Z" ))) {
+	while ( -1 != (i = getopt(argc, argv, "?Rhs:bc:Dd:fF:r:tTxXzeEl:qpC:P:Vg:Nm:I:Z" ))) {
 		switch (i) {
 		case '?':
 			hint();
@@ -3628,6 +3630,11 @@ printf("TIMESTAMP=%d.\n",time_stamp_type);
 			break;
 		case 'p':
 			showchildpid = 1;
+			break;
+		case 'P':
+			showchildpid = 1;
+			strcpy(pid_filename,optarg);
+			pid_filename_set = 1;
 			break;
 		case 'b':
 			colour = 0;
@@ -3897,8 +3904,18 @@ printf("TIMESTAMP=%d.\n",time_stamp_type);
 		/* disconnect from terminal */
 		fflush(NULL);
 		if (!debug && (childpid = fork()) != 0) {
-			if(showchildpid)
+			if(showchildpid && !pid_filename_set)
 				printf("%d\n",childpid);
+			if(showchildpid && pid_filename_set){
+				FILE * pidfile;
+				if((pidfile = fopen(pid_filename,"w")) == 0) {
+					perror("nmon: failed to open childs pidfile");
+					exit(43);
+				}
+				fprintf(pidfile,"%d",childpid);
+				fclose(pidfile);
+			}
+					
 			exit(0); /* parent returns OK */
 		}
 		if(!debug) {
