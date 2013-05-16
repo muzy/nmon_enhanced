@@ -422,7 +422,15 @@ int	colour = 1;	/* 1 = using colour curses and
 					attroff(A_STANDOUT); }
 FILE *fp;	/* filepointer for spreadsheet output */
 
-/* @FIXME PLEASEEEE*/
+/**
+ * Returns a string including either a timestamp or a 
+ * Numeric loop value. In RRD Output and normalized output
+ * the timestamp is shown, else the TXXXX string.
+ * 
+ * @return char*
+ * @param int loop Loop counter
+ * @param time_t eon Global Timer
+ */
 char *timestamp(int loop, time_t eon)
 {
 static char string[64];
@@ -2386,7 +2394,8 @@ void list_dgroup(struct dsk_stat *dk)
 	int   i, j, k, n;
 	int   first = 1;
 
-	/* DEBUG for (n = 0, i = 0; i < dgroup_total_groups; i++) {
+#ifdef DEBUG
+	for (n = 0, i = 0; i < dgroup_total_groups; i++) {
 		fprintf(fp, "CCCG,%03d,%s", n++, dgroup_name[i]);
 		for (j = 0; j < dgroup_disks[i]; j++) {
 			if (dgroup_data[i*DGROUPITEMS+j] != -1) {
@@ -2395,7 +2404,8 @@ void list_dgroup(struct dsk_stat *dk)
 		}
 		fprintf(fp, "\n");
 	   }
-	*/
+#endif /*DEBUG*/
+	// @TODO FIXME for normlized output
 	for (n = 0, i = 0; i < dgroup_total_groups; i++) {
 		if (first) {
 			fprintf(fp, "BBBG,%03d,User Defined Disk Groups Name,Disks\n", n++);
@@ -3940,6 +3950,7 @@ printf("TIMESTAMP=%d.\n",time_stamp_type);
 		fprintf(fp,"AAA,version,%s\n", VERSION);
 		fprintf(fp,"AAA,disks_per_line,%d\n", disks_per_line);
 		fprintf(fp,"AAA,max_disks,%d,set by -d option\n", diskmax);
+		fprintf(fp,"AAA,normalized_output,%s\n",(normalized_output)?"true":"false");
 		fprintf(fp,"AAA,disks,%d,\n", disks);
 
 		fprintf(fp,"AAA,host,%s\n", hostname);
@@ -3963,9 +3974,12 @@ printf("TIMESTAMP=%d.\n",time_stamp_type);
 		fprintf(fp,"AAA,note2, The T0001-T9999 column is a snapshot number. To work out the actual time; see the ZZZ section at the end\n");
 		}
 		fflush(NULL);
-
-		for (i = 1; i <= cpus; i++)
-			fprintf(fp,"CPU%03d,CPU %d %s,User%%,Sys%%,Wait%%,Idle%%\n", i, i, run_name);
+		if(!normalized_output){
+			for (i = 1; i <= cpus; i++)
+				fprintf(fp,"CPU%03d,CPU %d %s,User%%,Sys%%,Wait%%,Idle%%\n", i, i, run_name);
+		}else{
+			fprintf(fp,"CPU,Num,User%%,Sys%%,Wait%%,Idle%%\n");
+		}
 		fprintf(fp,"CPU_ALL,CPU Total %s,User%%,Sys%%,Wait%%,Idle%%,Busy,CPUs\n", run_name);
 		fprintf(fp,"MEM,Memory MB %s,memtotal,hightotal,lowtotal,swaptotal,memfree,highfree,lowfree,swapfree,memshared,cached,active,bigfree,buffers,swapcached,inactive\n", run_name);
 
@@ -3985,62 +3999,69 @@ printf("TIMESTAMP=%d.\n",time_stamp_type);
 		fprintf(fp,"FILE,File I/O %s,iget,namei,dirblk,readch,writech,ttyrawch,ttycanch,ttyoutch\n", run_name);
 */
 
-
-		fprintf(fp,"NET,Network I/O %s,", run_name);
-		for (i = 0; i < networks; i++)
-			fprintf(fp,"%-2s-read-KB/s,", (char *)p->ifnets[i].if_name);
-		for (i = 0; i < networks; i++)
-			fprintf(fp,"%-2s-write-KB/s,", (char *)p->ifnets[i].if_name);
-		fprintf(fp,"\n");
-		fprintf(fp,"NETPACKET,Network Packets %s,", run_name);
-		for (i = 0; i < networks; i++)
-			fprintf(fp,"%-2s-read/s,", (char *)p->ifnets[i].if_name);
-		for (i = 0; i < networks; i++)
-			fprintf(fp,"%-2s-write/s,", (char *)p->ifnets[i].if_name);
+		if(!normalized_output){
+			fprintf(fp,"NET,Network I/O %s,", run_name);
+			for (i = 0; i < networks; i++)
+				fprintf(fp,"%-2s-read-KB/s,", (char *)p->ifnets[i].if_name);
+			for (i = 0; i < networks; i++)
+				fprintf(fp,"%-2s-write-KB/s,", (char *)p->ifnets[i].if_name);
+			fprintf(fp,"\n");
+			fprintf(fp,"NETPACKET,Network Packets %s,", run_name);
+			for (i = 0; i < networks; i++)
+				fprintf(fp,"%-2s-read/s,", (char *)p->ifnets[i].if_name);
+			for (i = 0; i < networks; i++)
+				fprintf(fp,"%-2s-write/s,", (char *)p->ifnets[i].if_name);
+		}else{
+			fprintf(fp,"NET,Interface,read-KB/s,write-KB/s\n");
+			fprintf(fp,"NETPACKET,Interface,read/s,write/s");			
+		}
 		/* iremoved as it is not below in the BUSY line fprintf(fp,"\n"); */
 #ifdef DEBUG
 		if(debug)printf("disks=%d x%sx\n",(char *)disks,p->dk[0].dk_name);
 #endif /*DEBUG*/
-		for (i = 0; i < disks; i++)  {
-			if(NEWDISKGROUP(i))
-			    fprintf(fp,"\nDISKBUSY%s,Disk %%Busy %s", dskgrp(i) ,run_name);
-			fprintf(fp,",%s", (char *)p->dk[i].dk_name);
-		}
-		for (i = 0; i < disks; i++) {
-			if(NEWDISKGROUP(i))
-			    fprintf(fp,"\nDISKREAD%s,Disk Read KB/s %s", dskgrp(i),run_name);
-			fprintf(fp,",%s", (char *)p->dk[i].dk_name);
-		}
-		for (i = 0; i < disks; i++) {
-			if(NEWDISKGROUP(i))
-			    fprintf(fp,"\nDISKWRITE%s,Disk Write KB/s %s", (char *)dskgrp(i),run_name);
-			fprintf(fp,",%s", (char *)p->dk[i].dk_name);
-		}
-		for (i = 0; i < disks; i++) {
-			if(NEWDISKGROUP(i))
-				fprintf(fp,"\nDISKXFER%s,Disk transfers per second %s", (char *)dskgrp(i),run_name);
-			fprintf(fp,",%s", p->dk[i].dk_name);
-		}
-		for (i = 0; i < disks; i++) {
-			if(NEWDISKGROUP(i))
-				fprintf(fp,"\nDISKBSIZE%s,Disk Block Size %s", dskgrp(i),run_name);
-			fprintf(fp,",%s", (char *)p->dk[i].dk_name);
-		}
-		if( extended_disk == 1 && disk_mode == DISK_MODE_DISKSTATS )    {
-			for (i = 0; i < disks; i++) {
+		if(!normalized_output){
+			for (i = 0; i < disks; i++)  {
 				if(NEWDISKGROUP(i))
-					fprintf(fp,"\nDISKREADS%s,Disk Rd/s %s", dskgrp(i),run_name);
-				fprintf(fp,",%s", (char *)p->dk[i].dk_name);
-				}
-			for (i = 0; i < disks; i++) {
-				if(NEWDISKGROUP(i))
-					fprintf(fp,"\nDISKWRITES%s,Disk Wrt/s %s", dskgrp(i),run_name);
+					fprintf(fp,"\nDISKBUSY%s,Disk %%Busy %s", dskgrp(i) ,run_name);
 				fprintf(fp,",%s", (char *)p->dk[i].dk_name);
 			}
+			for (i = 0; i < disks; i++) {
+				if(NEWDISKGROUP(i))
+					fprintf(fp,"\nDISKREAD%s,Disk Read KB/s %s", dskgrp(i),run_name);
+				fprintf(fp,",%s", (char *)p->dk[i].dk_name);
+			}
+			for (i = 0; i < disks; i++) {
+				if(NEWDISKGROUP(i))
+					fprintf(fp,"\nDISKWRITE%s,Disk Write KB/s %s", (char *)dskgrp(i),run_name);
+				fprintf(fp,",%s", (char *)p->dk[i].dk_name);
+			}
+			for (i = 0; i < disks; i++) {
+				if(NEWDISKGROUP(i))
+					fprintf(fp,"\nDISKXFER%s,Disk transfers per second %s", (char *)dskgrp(i),run_name);
+				fprintf(fp,",%s", p->dk[i].dk_name);
+			}
+			for (i = 0; i < disks; i++) {
+				if(NEWDISKGROUP(i))
+					fprintf(fp,"\nDISKBSIZE%s,Disk Block Size %s", dskgrp(i),run_name);
+				fprintf(fp,",%s", (char *)p->dk[i].dk_name);
+			}
+			if( extended_disk == 1 && disk_mode == DISK_MODE_DISKSTATS )    {
+				for (i = 0; i < disks; i++) {
+					if(NEWDISKGROUP(i))
+						fprintf(fp,"\nDISKREADS%s,Disk Rd/s %s", dskgrp(i),run_name);
+					fprintf(fp,",%s", (char *)p->dk[i].dk_name);
+					}
+				for (i = 0; i < disks; i++) {
+					if(NEWDISKGROUP(i))
+						fprintf(fp,"\nDISKWRITES%s,Disk Wrt/s %s", dskgrp(i),run_name);
+					fprintf(fp,",%s", (char *)p->dk[i].dk_name);
+				}
+			}
+			fprintf(fp,"\n");
+		}else{
+			//here normalized outputli
 		}
-
-		fprintf(fp,"\n");
-                list_dgroup(p->dk);
+        list_dgroup(p->dk);
 		jfs_load(LOAD);
 		fprintf(fp,"JFSFILE,JFS Filespace %%Used %s", hostname);
 		for (k = 0; k < jfses; k++) {
@@ -6074,7 +6095,7 @@ fprintf(fp,"VM,Paging and Virtual Memory,nr_dirty,nr_writeback,nr_unstable,nr_pa
 			doupdate();
 
 			for (i = 0; i < seconds; i++) {
-				sleep(1);
+				sleep(1); /* this sleep is fine */
 				if (checkinput())
 					break;
 			}
@@ -6084,7 +6105,8 @@ fprintf(fp,"VM,Paging and Virtual Memory,nr_dirty,nr_writeback,nr_unstable,nr_pa
 			secs = seconds; 
 redo:
 			errno = 0;
-			ret = sleep(secs); 
+			ret = sleep(secs);  
+			/* this sleep is fine aswell */
 			/* Breakpoint_counter > 0 needed because loops have to be interrupted once
 			 * a breakpoint occurs
 			 */
