@@ -4011,11 +4011,11 @@ printf("TIMESTAMP=%d.\n",time_stamp_type);
 				fprintf(fp,"%-2s-read/s,", (char *)p->ifnets[i].if_name);
 			for (i = 0; i < networks; i++)
 				fprintf(fp,"%-2s-write/s,", (char *)p->ifnets[i].if_name);
+				/* no \n as it is defined in the BUSY line fprintf(fp,"\n"); below */
 		}else{
 			fprintf(fp,"NET,Interface,read-KB/s,write-KB/s\n");
-			fprintf(fp,"NETPACKET,Interface,read/s,write/s");			
+			fprintf(fp,"NETPACKET,Interface,read/s,write/s\n");			
 		}
-		/* iremoved as it is not below in the BUSY line fprintf(fp,"\n"); */
 #ifdef DEBUG
 		if(debug)printf("disks=%d x%sx\n",(char *)disks,p->dk[0].dk_name);
 #endif /*DEBUG*/
