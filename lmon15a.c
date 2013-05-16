@@ -4059,7 +4059,15 @@ printf("TIMESTAMP=%d.\n",time_stamp_type);
 			}
 			fprintf(fp,"\n");
 		}else{
-			//here normalized outputli
+			fprintf(fp,"DISKBUSY%s,Disk,%%Busy\n");
+			fprintf(fp,"DISKREAD%s,Disk,Read KB/s\n");
+			fprintf(fp,"DISKWRITE%s,Disk,Write KB/s\n");
+			fprintf(fp,"DISKXFER%s,Disk,transfers per second\n");
+			fprintf(fp,"DISKBSIZE%s,Disk,Block Size\n");
+			if( extended_disk == 1 && disk_mode == DISK_MODE_DISKSTATS )    {
+				fprintf(fp,"\nDISKREADS%s,Disk,Rd/s\n");
+				fprintf(fp,"\nDISKWRITES%s,Disk,Wrt/s\n");
+			}
 		}
         list_dgroup(p->dk);
 		jfs_load(LOAD);
