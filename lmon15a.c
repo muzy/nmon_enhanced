@@ -524,7 +524,7 @@ static int arg_first_time = 1;
 			tmpstr[strlen(tmpstr)-1]=0;
 		arglist[i].pid = pid;
 		if(arg_first_time) {
-			fprintf(fp,"UARG,+Time,PID,ProgName,FullCommand\n");
+			fprintf(fp,"UARG,Time,PID,ProgName,FullCommand\n");
 			arg_first_time = 0;
 		}
 		n=strlen(tmpstr);
@@ -2035,7 +2035,7 @@ void plot_save(double user, double kernel, double iowait, double idle)
 }
 
 /* This puts the CPU usage on the screen and draws the CPU graphs or outputs to the file */
-
+/* @TODO whatever this does. It's bad! */
 void save_smp(WINDOW *pad, int cpu_no, int row, long user, long kernel, long iowait, long idle, long nice, long irq, long softirq, long steal)
 {
 static int firsttime = 1;
@@ -2058,6 +2058,7 @@ static int firsttime = 1;
 	}
 }
 
+/* @TODO fix me! */
 void plot_smp(WINDOW *pad, int cpu_no, int row, double user, double kernel, double iowait, double idle)
 {
 	int	i;
@@ -2112,8 +2113,13 @@ void plot_smp(WINDOW *pad, int cpu_no, int row, double user, double kernel, doub
 			fprintf(fp,"CPU_ALL,%s,%.1lf,%.1lf,%.1lf,%.1lf,,%d\n", LOOP,
 			    user, kernel, iowait, idle,cpus);
 		else {
+			if(!normalized_output){
 			fprintf(fp,"CPU%03d,%s,%.1lf,%.1lf,%.1lf,%.1lf\n", cpu_no, LOOP,
 			    user, kernel, iowait, idle);
+			}else{
+				fprintf(fp,"CPU,%s,%03d,%.1lf,%.1lf,%.1lf,%.1lf\n", LOOP,cpu_no,
+			    user, kernel, iowait, idle);
+			}
 		}
 	}
 }
@@ -2405,7 +2411,7 @@ void list_dgroup(struct dsk_stat *dk)
 		fprintf(fp, "\n");
 	   }
 #endif /*DEBUG*/
-	// @TODO FIXME for normlized output
+	// @TODO FIXME for normalized output
 	for (n = 0, i = 0; i < dgroup_total_groups; i++) {
 		if (first) {
 			fprintf(fp, "BBBG,%03d,User Defined Disk Groups Name,Disks\n", n++);
@@ -2424,6 +2430,7 @@ void list_dgroup(struct dsk_stat *dk)
 		}
 		fprintf(fp, "\n");
 	}
+	if(!normalized_output){
 	fprintf(fp, "DGBUSY,Disk Group Busy %s", hostname);
 	for (i = 0; i < DGROUPS; i++) {
 		if (dgroup_name[i] != 0)
@@ -2513,11 +2520,34 @@ void list_dgroup(struct dsk_stat *dk)
 		}
 		fprintf(fp, "\n");
 #endif /*EXPERIMENTAL*/
+	}else{
+		fprintf(fp,"DGBUSY,Time,Disk Group,Busy\n");
+		fprintf(fp,"DGREAD,Time,Disk Group,Read KB/s\n");
+		fprintf(fp,"DGWRITE,Time,Disk Group,Write KB/s\n");
+		fprintf(fp,"DGSIZE,Time,Disk Group,Block Size KB\n");
+		fprintf(fp,"DGXFER,Time,Disk Group,Transfers/s\n");
+		/* If requested provide additional data available in /proc/diskstats */
+		if( extended_disk == 1 && disk_mode == DISK_MODE_DISKSTATS )	{
+			fprintf(fp,"DGREADS,Time,Disk Group read/s\n");
+			fprintf(fp,"DGREADMERGE,Time,Disk Group,merged read/s\n");
+			fprintf(fp,"DGREADSERV,Time,Disk Group,read service time (SUM ms)\n");
+			fprintf(fp,"DGWRITES,Time,Disk Group,write/s\n");
+			fprintf(fp,"DGWRITEMERGE,Time,Disk Group,merged write/s\n");
+			fprintf(fp,"DGWRITESERV,Time,Disk Group,write service time (SUM ms)\n");
+			fprintf(fp,"DGINFLIGHT,Time,Disk Group,in flight IO\n");
+			fprintf(fp,"DGIOTIME,Time,Disk Group,time spent for IO (ms)\n");
+#ifdef EXPERIMENTAL
+			fprintf(fp,"DGF11,Time,Disk Group,field 11\n");
+#endif /*EXPERIMENTAL*/		
+			}
+		}
 	}
 }
 
 
-
+/**
+ * Prints basic help information
+ */
 void hint(void)
 {
 	printf("\nHint: %s [-h] [-s <seconds>] [-c <count>] [-f -d <disks> -t -r <name>] [-x]\n\n", progname);
@@ -2535,6 +2565,10 @@ void hint(void)
 	printf("\n");
 }
 
+/**
+ * Prints full help information + hint and exits
+ * @TODO render manpage instead?
+ */
 void help(void)
 {
 	hint();
@@ -2568,6 +2602,11 @@ void help(void)
 	printf("\t-I <percent>  Include process & disks busy threshold (default 0.1)\n");
 	printf("\t              don't save or show proc/disk using less than this percent\n");
 	printf("\t-m <directory> nmon changes to this directory before saving to file\n");
+	printf("\t-p            write pid of nmon to stdout (like \"-P /dev/stdout\")\n");
+	printf("\t-P <pidfile>  write nmon pid to pidfile\n");		
+	printf("\t-e            enhanced mode where SIGUSR1 adds a breakpoint\n");
+	printf("\t-E            enhanced and normalized mode with normalized CSV output\n");
+	printf("\t-R            RRD output instead of CSV output (executeable shellscript)\n");
 	printf("\texample: collect for 1 hour at 30 second intervals with top procs\n");
 	printf("\t\t %s -f -t -r Test1 -s30 -c120\n",progname);
 	printf("\n");
@@ -2575,7 +2614,7 @@ void help(void)
 	printf("\tsort -A *nmon >stats.csv\n");
 	printf("\ttransfer the stats.csv file to your PC\n");
 	printf("\tStart spreadsheet & then Open type=comma-separated-value ASCII file\n");
-	printf("\t The nmon analyser or consolidator does not need the file sorted.\n");
+	printf("\t The nmon analyser or consolidator does not need the file sorted.\n");	
 	printf("\n");
 	printf("Capacity planning mode - use cron to run each day\n");
 	printf("\t-x            sensible spreadsheet output for CP =  one day\n");
@@ -3334,14 +3373,18 @@ int count =0;
 /* --- */
 
 char cpu_line[] = "---------------------------+-------------------------------------------------+";
-/* Start process as specified in cmd in a child process without waiting
+/**
+ * Start process as specified in cmd in a child process without waiting
  * for completion
- * not sure if want to prevent this funcitonality for root user
- * when: CHLD_START, CHLD_SNAP or CHLD_END
- * cmd:  pointer to command string - assumed to be cleansed ....
- * timestamp_type: 0 - T%04d, 1 - detailed time stamp
- * loop: loop id (0 for CHLD_START)
- * the_time: time to use for timestamp generation
+ * 
+ * @TODO Sanity check for cmd parameter
+ * @TODO Prevent this functionality for root user?
+ * 
+ * @PARAM when CHLD_START, CHLD_SNAP or CHLD_END
+ * @PARAM cmd pointer to command string - assumed to be cleaned 
+ * @PARAM timestamp_type  0 - T%04d, 1 - detailed time stamp
+ * @PARAM loop loop id (0 for CHLD_START)
+ * @PARAM the_time time to use for timestamp generation
  */
 void child_start(int when,
                 char *cmd,
@@ -3370,7 +3413,7 @@ fprintf(fp,"child start when=%d cmd=%s time=%d loop=%d\n",when,cmd,timestamp_typ
                 case CHLD_SNAP:
                         /* check if old child has finished - otherwise we do nothing */
                         if( nmon_children[CHLD_SNAP] != -1 ) {
-                                if(!cursed)fprintf(fp,"ERROR,T%04d, Starting snap command \"%s\" failed as previous child still running - killing it now\n", loop, cmd);
+                                if(!cursed)fprintf(fp,"ERROR,%s, Starting snap command \"%s\" failed as previous child still running - killing it now\n", LOOP, cmd);
                                 kill( nmon_children[CHLD_SNAP],9);
                         }
 
@@ -3557,6 +3600,7 @@ int main(int argc, char **argv)
 			progname = &progname[i+1];
 		}
 
+	/* @TODO document environmental variables */
 	if(getenv("NMONDEBUG") != NULL) 
 		debug=1;
 	if(getenv("NMONERROR") != NULL) 
@@ -3753,11 +3797,11 @@ printf("TIMESTAMP=%d.\n",time_stamp_type);
 			printf("nmon verion %s\n",VERSION);
 			exit(0);
 			break;
-                case 'g': /* disk groups */
-                        show_dgroup = 1;
-                        dgroup_loaded = 1;
-                        dgroup_filename = optarg;
-                        break;
+        case 'g': /* disk groups */
+            show_dgroup = 1;
+            dgroup_loaded = 1;
+            dgroup_filename = optarg;
+            break;
 		}
 	}
 	
@@ -3942,47 +3986,54 @@ printf("TIMESTAMP=%d.\n",time_stamp_type);
                 }
 
 		if(show_aaa) {
-		fprintf(fp,"AAA,progname,%s\n", progname);
-		fprintf(fp,"AAA,command,");
-		for(i=0;i<argc;i++)
-			fprintf(fp,"%s ",argv[i]);
-		fprintf(fp,"\n");
-		fprintf(fp,"AAA,version,%s\n", VERSION);
-		fprintf(fp,"AAA,disks_per_line,%d\n", disks_per_line);
-		fprintf(fp,"AAA,max_disks,%d,set by -d option\n", diskmax);
-		fprintf(fp,"AAA,normalized_output,%s\n",(normalized_output)?"true":"false");
-		fprintf(fp,"AAA,disks,%d,\n", disks);
+			if(!show_rrd){
+				// rrd output has to be different - new considerations are to be taken
+				fprintf(fp,"AAA,progname,%s\n", progname);
+				fprintf(fp,"AAA,command,");
+				for(i=0;i<argc;i++)
+					fprintf(fp,"%s ",argv[i]);
+				fprintf(fp,"\n");
+				fprintf(fp,"AAA,version,%s\n", VERSION);
+				fprintf(fp,"AAA,disks_per_line,%d\n", disks_per_line);
+				fprintf(fp,"AAA,max_disks,%d,set by -d option\n", diskmax);
+				fprintf(fp,"AAA,normalized_output,%s\n",(normalized_output)?"true":"false");
+				fprintf(fp,"AAA,disks,%d,\n", disks);
 
-		fprintf(fp,"AAA,host,%s\n", hostname);
-		fprintf(fp,"AAA,user,%s\n", getenv("USER"));
-		fprintf(fp,"AAA,OS,Linux,%s,%s,%s\n",uts.release,uts.version,uts.machine); 
-		fprintf(fp,"AAA,runname,%s\n", run_name);
-		fprintf(fp,"AAA,time,%02d:%02d:%02d\n", tim->tm_hour, tim->tm_min, tim->tm_sec);
-		fprintf(fp,"AAA,date,%02d-%3s-%02d\n", tim->tm_mday, month[tim->tm_mon-1], tim->tm_year+2000);
-		fprintf(fp,"AAA,interval,%d\n", seconds);
-		fprintf(fp,"AAA,snapshots,%d\n", maxloops);
+				fprintf(fp,"AAA,host,%s\n", hostname);
+				fprintf(fp,"AAA,user,%s\n", getenv("USER"));
+				fprintf(fp,"AAA,OS,Linux,%s,%s,%s\n",uts.release,uts.version,uts.machine); 
+				fprintf(fp,"AAA,runname,%s\n", run_name);
+				fprintf(fp,"AAA,time,%02d:%02d:%02d\n", tim->tm_hour, tim->tm_min, tim->tm_sec);
+				fprintf(fp,"AAA,date,%02d-%3s-%02d\n", tim->tm_mday, month[tim->tm_mon-1], tim->tm_year+2000);
+				fprintf(fp,"AAA,interval,%d\n", seconds);
+				fprintf(fp,"AAA,snapshots,%d\n", maxloops);
 #ifdef POWER
-		fprintf(fp,"AAA,cpus,%d,%d\n", cpus/lparcfg.smt_mode,cpus);	/* physical CPU, logical CPU */
-		fprintf(fp,"AAA,CPU ID length,3\n");	/* Give analyzer a chance to easily find length of CPU number - 3 digits here! */
+				fprintf(fp,"AAA,cpus,%d,%d\n", cpus/lparcfg.smt_mode,cpus);	/* physical CPU, logical CPU */
+				fprintf(fp,"AAA,CPU ID length,3\n");	/* Give analyzer a chance to easily find length of CPU number - 3 digits here! */
 #else
-		fprintf(fp,"AAA,cpus,%d\n", cpus);
+				fprintf(fp,"AAA,cpus,%d\n", cpus);
 #endif
-		fprintf(fp,"AAA,proc_stat_variables,%d\n", stat8);
+				fprintf(fp,"AAA,proc_stat_variables,%d\n", stat8);
 
-		fprintf(fp,"AAA,note0, Warning - use the UNIX sort command to order this file before loading into a spreadsheet\n");
-		fprintf(fp,"AAA,note1, The First Column is simply to get the output sorted in the right order\n");
-		fprintf(fp,"AAA,note2, The T0001-T9999 column is a snapshot number. To work out the actual time; see the ZZZ section at the end\n");
+				fprintf(fp,"AAA,note0, Warning - use the UNIX sort command to order this file before loading into a spreadsheet\n");
+				fprintf(fp,"AAA,note1, The First Column is simply to get the output sorted in the right order\n");
+				fprintf(fp,"AAA,note2, The T0001-T9999 column is a snapshot number. To work out the actual time; see the ZZZ section at the end\n");
+				}
 		}
 		fflush(NULL);
 		if(!normalized_output){
 			for (i = 1; i <= cpus; i++)
 				fprintf(fp,"CPU%03d,CPU %d %s,User%%,Sys%%,Wait%%,Idle%%\n", i, i, run_name);
 		}else{
-			fprintf(fp,"CPU,Num,User%%,Sys%%,Wait%%,Idle%%\n");
+			fprintf(fp,"CPU,Time,Num,User%%,Sys%%,Wait%%,Idle%%\n");
 		}
-		fprintf(fp,"CPU_ALL,CPU Total %s,User%%,Sys%%,Wait%%,Idle%%,Busy,CPUs\n", run_name);
-		fprintf(fp,"MEM,Memory MB %s,memtotal,hightotal,lowtotal,swaptotal,memfree,highfree,lowfree,swapfree,memshared,cached,active,bigfree,buffers,swapcached,inactive\n", run_name);
-
+		if(!normalized_output){
+			fprintf(fp,"CPU_ALL,CPU Total %s,User%%,Sys%%,Wait%%,Idle%%,Busy,CPUs\n", run_name);
+			fprintf(fp,"MEM,Memory MB %s,memtotal,hightotal,lowtotal,swaptotal,memfree,highfree,lowfree,swapfree,memshared,cached,active,bigfree,buffers,swapcached,inactive\n", run_name);
+		}else{
+			fprintf(fp,"CPU_ALL,Time,User%%,Sys%%,Wait%%,Idle%%,Busy,CPUs\n");
+			fprintf(fp,"MEM,Time,memtotal,hightotal,lowtotal,swaptotal,memfree,highfree,lowfree,swapfree,memshared,cached,active,bigfree,buffers,swapcached,inactive\n");
+		}
 #ifdef POWER
 		proc_lparcfg();
 		if(lparcfg.cmo_enabled)
@@ -3993,7 +4044,10 @@ printf("TIMESTAMP=%d.\n",time_stamp_type);
 #endif /* EXPERIMENTAL */
 #endif /* POWER */
 
-		fprintf(fp,"PROC,Processes %s,Runnable,Blocked,pswitch,syscall,read,write,fork,exec,sem,msg\n", run_name);
+		if(!normalized_output)
+			fprintf(fp,"PROC,Processes %s,Runnable,Blocked,pswitch,syscall,read,write,fork,exec,sem,msg\n", run_name);
+		else
+			fprintf(fp,"PROC,Time,Runnable,Blocked,pswitch,syscall,read,write,fork,exec,sem,msg\n");
 /*
 		fprintf(fp,"PAGE,Paging %s,faults,pgin,pgout,pgsin,pgsout,reclaims,scans,cycles\n", run_name);
 		fprintf(fp,"FILE,File I/O %s,iget,namei,dirblk,readch,writech,ttyrawch,ttycanch,ttyoutch\n", run_name);
@@ -4013,8 +4067,8 @@ printf("TIMESTAMP=%d.\n",time_stamp_type);
 				fprintf(fp,"%-2s-write/s,", (char *)p->ifnets[i].if_name);
 				/* no \n as it is defined in the BUSY line fprintf(fp,"\n"); below */
 		}else{
-			fprintf(fp,"NET,Interface,read-KB/s,write-KB/s\n");
-			fprintf(fp,"NETPACKET,Interface,read/s,write/s\n");			
+			fprintf(fp,"NET,Time,Interface,read-KB/s,write-KB/s\n");
+			fprintf(fp,"NETPACKET,Time,Interface,read/s,write/s\n");			
 		}
 #ifdef DEBUG
 		if(debug)printf("disks=%d x%sx\n",(char *)disks,p->dk[0].dk_name);
@@ -4059,29 +4113,33 @@ printf("TIMESTAMP=%d.\n",time_stamp_type);
 			}
 			fprintf(fp,"\n");
 		}else{
-			fprintf(fp,"DISKBUSY%s,Disk,%%Busy\n");
-			fprintf(fp,"DISKREAD%s,Disk,Read KB/s\n");
-			fprintf(fp,"DISKWRITE%s,Disk,Write KB/s\n");
-			fprintf(fp,"DISKXFER%s,Disk,transfers per second\n");
-			fprintf(fp,"DISKBSIZE%s,Disk,Block Size\n");
+			fprintf(fp,"DISKBUSY,Time,Disk,%%Busy\n");
+			fprintf(fp,"DISKREAD,Time,Disk,Read KB/s\n");
+			fprintf(fp,"DISKWRITE,Time,Disk,Write KB/s\n");
+			fprintf(fp,"DISKXFER,Time,Disk,transfers per second\n");
+			fprintf(fp,"DISKBSIZE,Time,Disk,Block Size\n");
 			if( extended_disk == 1 && disk_mode == DISK_MODE_DISKSTATS )    {
-				fprintf(fp,"\nDISKREADS%s,Disk,Rd/s\n");
-				fprintf(fp,"\nDISKWRITES%s,Disk,Wrt/s\n");
+				fprintf(fp,"\nDISKREADS,Time,Disk,Rd/s\n");
+				fprintf(fp,"\nDISKWRITES,Time,Disk,Wrt/s\n");
 			}
 		}
         list_dgroup(p->dk);
 		jfs_load(LOAD);
-		fprintf(fp,"JFSFILE,JFS Filespace %%Used %s", hostname);
-		for (k = 0; k < jfses; k++) {
-  		    if(jfs[k].mounted && strncmp(jfs[k].name,"/proc",5)
-  		    			&& strncmp(jfs[k].name,"/sys",4)
-  		    			&& strncmp(jfs[k].name,"/dev/pts",8)
-					&& strncmp(jfs[k].name,"/dev/shm",8)
-					&& strncmp(jfs[k].name,"/var/lib/nfs/rpc",16)
-			)  /* /proc gives invalid/insane values */
-			fprintf(fp,",%s", jfs[k].name); 
+		if(!normalized_output){
+			fprintf(fp,"JFSFILE,JFS Filespace %%Used %s", hostname);
+			for (k = 0; k < jfses; k++) {
+				if(jfs[k].mounted && strncmp(jfs[k].name,"/proc",5)
+							&& strncmp(jfs[k].name,"/sys",4)
+							&& strncmp(jfs[k].name,"/dev/pts",8)
+						&& strncmp(jfs[k].name,"/dev/shm",8)
+						&& strncmp(jfs[k].name,"/var/lib/nfs/rpc",16)
+				)  /* /proc gives invalid/insane values */
+				fprintf(fp,",%s", jfs[k].name); 
+			}
+			fprintf(fp,"\n");
+		}else{
+			fprintf(fp,"JFSFILE,Time,Filespace,%%Used\n");
 		}
-		fprintf(fp,"\n");
 		jfs_load(UNLOAD);
 #ifdef POWER
 		if( proc_lparcfg() && lparcfg.shared_processor_mode != 0 ){
@@ -4090,11 +4148,17 @@ printf("TIMESTAMP=%d.\n",time_stamp_type);
 		}
 #endif /*POWER*/
 		if(show_top){
-			fprintf(fp,"TOP,%%CPU Utilisation\n");
+			//fprintf(fp,"TOP,%%CPU Utilisation\n"); //* this row was unnecessary! */
 #ifndef KERNEL_2_6_18
-			fprintf(fp,"TOP,+PID,Time,%%CPU,%%Usr,%%Sys,Size,ResSet,ResText,ResData,ShdLib,MinorFault,MajorFault,Command\n");
+			if(!normalized_output)
+				fprintf(fp,"TOP,+PID,Time,%%CPU,%%Usr,%%Sys,Size,ResSet,ResText,ResData,ShdLib,MinorFault,MajorFault,Command\n");
+			else
+				fprintf(fp,"TOP,Time,PID,%%CPU,%%Usr,%%Sys,Size,ResSet,ResText,ResData,ShdLib,MinorFault,MajorFault,Command\n");
 #else
-			fprintf(fp,"TOP,+PID,Time,%%CPU,%%Usr,%%Sys,Size,ResSet,ResText,ResData,ShdLib,MinorFault,MajorFault,Command,Threads,IOwaitTime\n");
+			if(!normalized_output)
+				fprintf(fp,"TOP,+PID,Time,%%CPU,%%Usr,%%Sys,Size,ResSet,ResText,ResData,ShdLib,MinorFault,MajorFault,Command,Threads,IOwaitTime\n");
+			else
+				fprintf(fp,"TOP,Time,PID,%%CPU,%%Usr,%%Sys,Size,ResSet,ResText,ResData,ShdLib,MinorFault,MajorFault,Command,Threads,IOwaitTime\n");
 #endif
 		}
 		linux_bbbp("/etc/release",    "/bin/cat /etc/*ease 2>/dev/null", WARNING);
@@ -4142,7 +4206,7 @@ printf("TIMESTAMP=%d.\n",time_stamp_type);
 		linux_bbbp("uptime",    "/usr/bin/uptime 2>/dev/null", WARNING);
 		linux_bbbp("getconf PAGESIZE",    "/usr/bin/getconf PAGESIZE  2>/dev/null", WARNING);
 
-		sleep(1); /* to get the first stats to cover this one second and avoids divide by zero issues  @FIXME!!!!*/
+		//sleep(1); /* to get the first stats to cover this one second and avoids divide by zero issues  @FIXME!!!!*/
 	     }
 	/* To get the pointers setup */
 	/* Was already done earlier, DONT'T switch back here to the old pointer! - switcher(); */
@@ -4229,7 +4293,7 @@ mvprintw(x+16, 3, "   h = more options                   q = Quit");
 			}
 
 
-			if(!show_rrd)
+			if(!show_rrd && !normalized_output)
 			    fprintf(fp,"ZZZZ,%s,%02d:%02d:%02d,%02d-%s-%4d\n", LOOP, 
 					tim->tm_hour, tim->tm_min, tim->tm_sec,
 					tim->tm_mday, month[tim->tm_mon], tim->tm_year+1900);
@@ -4333,7 +4397,8 @@ mvprintw(x+16, 3, "   h = more options                   q = Quit");
 				DISPLAY(padlong,MAX_SNAP_ROWS+2);
 		}
 		if (show_smp || show_verbose) {
-			if(cpus>max_cpus && !cursed) {
+			/* this happens if the number of CPU increases */
+			if(cpus>max_cpus && !cursed && !normalized_output) {
 				for (i = max_cpus+1; i <= cpus; i++)
 					fprintf(fp,"CPU%03d,CPU %d %s,User%%,Sys%%,Wait%%,Idle%%\n", i, i, run_name);
 				max_cpus= cpus;
@@ -4341,10 +4406,16 @@ mvprintw(x+16, 3, "   h = more options                   q = Quit");
 			if( old_cpus != cpus )	{
 				if( !cursed )	{
 					if( bbbr_line == 0)	{
-						fprintf(fp,"BBBR,0,Reconfig,action,old,new\n");
+						if( !normalized_output )
+							fprintf(fp,"BBBR,0,Reconfig,action,old,new\n");
+						else
+							fprintf(fp,"BBBR,Time,ID,action,old_value,new_value\n");
 						bbbr_line++;
 					}
-					fprintf(fp,"BBBR,%03d,%s,cpuchg,%d,%d\n",bbbr_line++,LOOP,old_cpus,cpus);
+					if( !normalized_output )
+						fprintf(fp,"BBBR,%03d,%s,cpuchg,%d,%d\n",bbbr_line++,LOOP,old_cpus,cpus);
+					else
+						fprintf(fp,"BBBR,%s,%03d,cpuchg,%d,%d\n",LOOP,bbbr_line++,old_cpus,cpus);
 				}
 				else 	{
 					/* wmove(padsmp,0,0); */
@@ -5181,23 +5252,33 @@ fprintf(fp,"VM,Paging and Virtual Memory,nr_dirty,nr_writeback,nr_unstable,nr_pa
 					);
 			}
 			DISPLAY(padnet,networks + 2);
+			/* @FIXME normalization */
 			if (!cursed) {
-				fprintf(fp,show_rrd ? "rrdtool update net.rrd %s" : "NET,%s,", LOOP);
-				for (i = 0; i < networks; i++) {
-					fprintf(fp,show_rrd ? ":%.1f" : "%.1f,", IFDELTA(if_ibytes) / 1024.0);
+				if(!normalized_output){
+					fprintf(fp,show_rrd ? "rrdtool update net.rrd %s" : "NET,%s,", LOOP);
+					for (i = 0; i < networks; i++) {
+						fprintf(fp,show_rrd ? ":%.1f" : "%.1f,", IFDELTA(if_ibytes) / 1024.0);
+					}
+					for (i = 0; i < networks; i++) {
+						fprintf(fp,show_rrd ? ":%.1f" : "%.1f,", IFDELTA(if_obytes) / 1024.0);
+					}
+					fprintf(fp,"\n");
+					fprintf(fp,show_rrd ? "rrdtool update netpacket.rrd %s" : "NETPACKET,%s,", LOOP);
+					for (i = 0; i < networks; i++) {
+						fprintf(fp,show_rrd ? ":%.1f" : "%.1f,", IFDELTA(if_ipackets) );
+					}
+					for (i = 0; i < networks; i++) {
+						fprintf(fp,show_rrd ? ":%.1f" : "%.1f,", IFDELTA(if_opackets) );
+					}
+					fprintf(fp,"\n");
+				}else{
+					for (i = 0; i < networks; i++) {
+						fprintf(fp,"NET,%s,%s,%.1f,%.1f\n", LOOP, (char *)p->ifnets[i].if_name,(IFDELTA(if_ibytes) / 1024.0), (IFDELTA(if_obytes) / 1024.0));
+					}
+					for (i = 0; i < networks; i++) {
+						fprintf(fp,"NETPACKET,%s,%s,%.1f,%.1f\n", LOOP, (char *)p->ifnets[i].if_name, IFDELTA(if_ipackets), IFDELTA(if_opackets));
+					}
 				}
-				for (i = 0; i < networks; i++) {
-					fprintf(fp,show_rrd ? ":%.1f" : "%.1f,", IFDELTA(if_obytes) / 1024.0);
-				}
-				fprintf(fp,"\n");
-				fprintf(fp,show_rrd ? "rrdtool update netpacket.rrd %s" : "NETPACKET,%s,", LOOP);
-				for (i = 0; i < networks; i++) {
-					fprintf(fp,show_rrd ? ":%.1f" : "%.1f,", IFDELTA(if_ipackets) );
-				}
-				for (i = 0; i < networks; i++) {
-					fprintf(fp,show_rrd ? ":%.1f" : "%.1f,", IFDELTA(if_opackets) );
-				}
-				fprintf(fp,"\n");
 			}
 		}
 		errors=0;
@@ -5314,24 +5395,43 @@ fprintf(fp,"VM,Paging and Virtual Memory,nr_dirty,nr_writeback,nr_unstable,nr_pa
 			}
 			DISPLAY(padjfs,2 + jfses);
 		    } else {
+			/* @FIXME normalized output */
 			jfs_load(LOAD);
-			fprintf(fp,show_rrd ? "rrdtool update jfsfile.rrd %s" : "JFSFILE,%s", LOOP);
-			for (k = 0; k < jfses; k++) {
-			    if(jfs[k].mounted && strncmp(jfs[k].name,"/proc",5)
-						&& strncmp(jfs[k].name,"/sys",4)
-						&& strncmp(jfs[k].name,"/dev/pts",8)
-						&& strncmp(jfs[k].name,"/dev/shm",8)
-						&& strncmp(jfs[k].name,"/var/lib/nfs/rpc",16)
-				)   { /* /proc gives invalid/insane values */
-					    if(fstatfs( jfs[k].fd, &statfs_buffer) != -1) {
-					fprintf(fp, show_rrd ? ":%.1f" : ",%.1f",
-					((float)statfs_buffer.f_blocks - (float)statfs_buffer.f_bfree)/(float)statfs_buffer.f_blocks*100.0);
-				    }
-				    else
-					fprintf(fp, show_rrd? ":U" : ",0.0");
+			if(!normalized_output){
+				fprintf(fp,show_rrd ? "rrdtool update jfsfile.rrd %s" : "JFSFILE,%s", LOOP);
+				for (k = 0; k < jfses; k++) {
+					if(jfs[k].mounted && strncmp(jfs[k].name,"/proc",5)
+							&& strncmp(jfs[k].name,"/sys",4)
+							&& strncmp(jfs[k].name,"/dev/pts",8)
+							&& strncmp(jfs[k].name,"/dev/shm",8)
+							&& strncmp(jfs[k].name,"/var/lib/nfs/rpc",16)
+					)   { /* /proc gives invalid/insane values */
+							if(fstatfs( jfs[k].fd, &statfs_buffer) != -1) {
+						fprintf(fp, show_rrd ? ":%.1f" : ",%.1f",
+						((float)statfs_buffer.f_blocks - (float)statfs_buffer.f_bfree)/(float)statfs_buffer.f_blocks*100.0);
+						}
+						else
+						fprintf(fp, show_rrd? ":U" : ",0.0");
+					}
+				}
+				fprintf(fp, "\n");
+			}else{
+				for (k = 0; k < jfses; k++) {
+					if(jfs[k].mounted && strncmp(jfs[k].name,"/proc",5)
+							&& strncmp(jfs[k].name,"/sys",4)
+							&& strncmp(jfs[k].name,"/dev/pts",8)
+							&& strncmp(jfs[k].name,"/dev/shm",8)
+							&& strncmp(jfs[k].name,"/var/lib/nfs/rpc",16)
+					)  { 
+						if(fstatfs( jfs[k].fd, &statfs_buffer) != -1) {
+							fprintf(fp, "JFSFILE,%s,%s,%.1f\n",LOOP, jfs[k].name,
+							((float)statfs_buffer.f_blocks - (float)statfs_buffer.f_bfree)/(float)statfs_buffer.f_blocks*100.0);
+						}
+						else
+							fprintf(fp,"JFSFILE,%s,%s,0.0\n",LOOP, jfs[k].name);
+					}
 				}
 			}
-			fprintf(fp, "\n");
 			jfs_load(UNLOAD);
 		    }
 		}
@@ -5544,6 +5644,7 @@ fprintf(fp,"VM,Paging and Virtual Memory,nr_dirty,nr_writeback,nr_unstable,nr_pa
 				}
 				DISPLAY(paddisk,3 + k);
 			} else {
+				/* @TODO normalized output */
 				for (i = 0; i < disks; i++) {
 					if(NEWDISKGROUP(i))
 						fprintf(fp,show_rrd ? "%srrdtool update diskbusy%s.rrd %s" : "%sDISKBUSY%s,%s",i == 0 ? "": "\n", dskgrp(i), LOOP);
@@ -6049,6 +6150,7 @@ fprintf(fp,"VM,Paging and Virtual Memory,nr_dirty,nr_writeback,nr_unstable,nr_pa
 					    if((cmdfound && cmdcheck(p->procs[i].pi_comm)) || 
 						(!cmdfound && ((topper[j].time / elapsed) > ignore_procdisk_threshold)) )
 						 {
+						if(!normalized_output){
 #ifndef KERNEL_2_6_18
 					   	fprintf(fp,"TOP,%07d,%s,%.2f,%.2f,%.2f,%lu,%lu,%lu,%lu,%lu,%d,%d,%s\n",
 #else
@@ -6071,12 +6173,41 @@ fprintf(fp,"VM,Paging and Virtual Memory,nr_dirty,nr_writeback,nr_unstable,nr_pa
 #ifndef KERNEL_2_6_18
 					   	);
 #else
+					    ,
+					    p->procs[i].pi_num_threads,
+					    COUNTDELTA(pi_delayacct_blkio_ticks)
+					   	);
+#endif
+						}else{
+#ifndef KERNEL_2_6_18
+					   	fprintf(fp,"TOP,%s,%07d,%.2f,%.2f,%.2f,%lu,%lu,%lu,%lu,%lu,%d,%d,%s\n",
+#else
+					   	fprintf(fp,"TOP,%s,%07d,%.2f,%.2f,%.2f,%lu,%lu,%lu,%lu,%lu,%d,%d,%s,%ld,%llu\n",
+#endif
+					    /* 1 */ LOOP,
+					    /* 2 */ p->procs[i].pi_pid,
+					    /* 3 */ topper[j].time / elapsed,
+                                            /* 4 */ TIMEDELTA(pi_utime,i,topper[j].other) / elapsed,
+                                            /* 5 */ TIMEDELTA(pi_stime,i,topper[j].other) / elapsed,
+					    /* 6 */ p->procs[i].statm_size*pagesize/1024UL, /* in KB */
+					    /* 7 */ p->procs[i].statm_resident*pagesize/1024UL, /* in KB */
+					    /* 8 */ p->procs[i].statm_trs*pagesize/1024UL, /* in KB */
+					    /* 9 */ p->procs[i].statm_drs*pagesize/1024UL, /* in KB */
+					    /* 10*/ p->procs[i].statm_share*pagesize/1024UL, /* in KB */
+					    /* 11*/ (int)(COUNTDELTA(pi_minflt) / elapsed),
+					    /* 12*/ (int)(COUNTDELTA(pi_majflt) / elapsed),
+					    /* 13*/ p->procs[i].pi_comm
+
+#ifndef KERNEL_2_6_18
+					   	);
+#else
 
 					    ,
 					    p->procs[i].pi_num_threads,
 					    COUNTDELTA(pi_delayacct_blkio_ticks)
 					   	);
 #endif
+						}
 
 					    if(show_args)
 						args_output(p->procs[i].pi_pid,loop, p->procs[i].pi_comm);

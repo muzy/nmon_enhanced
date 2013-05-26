@@ -1,0 +1,57 @@
+New Features
+============
+
+RRDTool support
+	- fix missing create statements
+	- omit uneeded output/output not applicable for storing in rrd database
+	
+	Huge new todo: inititalization of rrd database (make output file new shellscript for initialization?
+	
+Normalization
+	- add switch for normalization
+	- normalize CSV Output
+	
+	FIXES: list_dgroup
+	
+Breakpoint support
+	- Add breakpoint using SIGUSR1
+	DONE in #d26ac81
+	
+In-Program Documentation
+	- Change hint & help functions
+
+To be fixed
+===========
+
+Error-Output
+	- Change output depending on medium. Create Error-Database for rrd output, create error table for CSV output
+	DONE in #70544db
+	
+Documentation
+	- Document everything using doxygen
+	
+Manpage
+	- Write an up-to-date manpage documenting all features
+
+Variable Names
+	- Change variable names to expressive names. Variables like "ralfmode" are confusing.
+	
+BBBP and AAAA Output
+	- not applicable for rrd output
+	
+Network Error Counter
+	- only available in cursed mode. Why?
+
+Whislist
+========
+
+Switches for every option.
+
+Documentation ToDo
+==================
+* Switch -p (show child pid)
+* Switch -R (rrd database)
+* Switch -e (enhanced where SIGUSR1 sets breakpoint)
+* Switch -E (like -e but with normalized output)
+
+Environmental variables
