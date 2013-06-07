@@ -5645,6 +5645,7 @@ fprintf(fp,"VM,Paging and Virtual Memory,nr_dirty,nr_writeback,nr_unstable,nr_pa
 				DISPLAY(paddisk,3 + k);
 			} else {
 				/* @TODO normalized output */
+				if(!normalized_output){
 				for (i = 0; i < disks; i++) {
 					if(NEWDISKGROUP(i))
 						fprintf(fp,show_rrd ? "%srrdtool update diskbusy%s.rrd %s" : "%sDISKBUSY%s,%s",i == 0 ? "": "\n", dskgrp(i), LOOP);
@@ -5702,6 +5703,29 @@ fprintf(fp,"VM,Paging and Virtual Memory,nr_dirty,nr_writeback,nr_unstable,nr_pa
 					}
 				}
 				fprintf(fp,"\n");
+				}else{
+				for (i = 0; i < disks; i++) {
+					fprintf(fp,"DISKBUSY,%s,%s", LOOP, (char *)p->dk[i].dk_name);
+					/* check percentage is correct */
+					ftmp = DKDELTA(dk_time) / elapsed;
+					if(ftmp > 100.0 || ftmp < 0.0)
+						fprintf(fp,",101.00\n");
+					else
+						fprintf(fp,",%.1f\n",DKDELTA(dk_time) / elapsed);
+					fprintf(fp,"DISKREAD,%s,%s,%.1f\n", LOOP, (char *)p->dk[i].dk_name, DKDELTA(dk_rkb) / elapsed);
+					fprintf(fp,"DISKWRITE,%s,%s,%.1f\n", LOOP, (char *)p->dk[i].dk_name, DKDELTA(dk_wkb) / elapsed);
+					fprintf(fp,"DISKXFER,%s,%s,%.1f\n",  LOOP, (char *)p->dk[i].dk_name,  DKDELTA(dk_xfers) / elapsed);
+					fprintf(fp,"DISKBSIZE,%s,%s,%.1f\n", LOOP, (char *)p->dk[i].dk_name, (DKDELTA(dk_xfers) == 0.0) ? 0.0 :
+						    ((DKDELTA(dk_rkb) + DKDELTA(dk_wkb) ) / DKDELTA(dk_xfers)));
+					
+					if( extended_disk == 1 && disk_mode == DISK_MODE_DISKSTATS )	{
+						fprintf(fp,"DISKREADS,%s,%s,%.1f", LOOP, (char *)p->dk[i].dk_name, DKDELTA(dk_reads)/elapsed);
+						fprintf(fp,"DISKWRITES,%s,%s,%.1f", LOOP, (char *)p->dk[i].dk_name, DKDELTA(dk_writes)/elapsed);
+						
+					
+					}
+				}
+			}
 			}
 		}
 		if ((show_dgroup || (!cursed && dgroup_loaded))) {
