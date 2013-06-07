@@ -1,3 +1,5 @@
+cc -o nmon lmon15a.c -g -O2 -D JFS -D GETUSER -Wall -D LARGEMEM -lncurses -g
+
 New Features
 ============
 
